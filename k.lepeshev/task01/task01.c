@@ -4,13 +4,17 @@
 #include <string.h>
 #include <sys/types.h>
 #include <errno.h>
-#include <limits.h>
+#include <sys/resource.h>
 #include <ulimit.h>
+
+extern char **environ;
 
 typedef struct Option{
     char name;
     char *argument;
 } Option;
+
+typedef struct rlimit rlimit;
 
 
 int main(int argc, char *argv[]){
@@ -32,25 +36,29 @@ int main(int argc, char *argv[]){
 
     int option = 0;
 
-    while((option = getopt(argc, argv, "ipdsuU:")) != -1){
+    while((option = getopt(argc, argv, "ipdsuU:cC:vV:")) != -1){
         switch(option){
             case 'i':
             case 'p':
             case 'd':
             case 's':
             case 'u':
+            case 'c':
+            case 'v':
                 options[idx].name = option;
                 options[idx].argument = NULL;
                 idx++;
                 break;
             case 'U':
+            case 'C':
+            case 'V':
                 options[idx].name = option;
                 options[idx].argument = optarg;
                 idx++;
                 break;
             case '?':
-                printf("Unknown option\n");
-                break;
+                free(options);
+                return 1;
 
         }
     }
@@ -94,6 +102,29 @@ int main(int argc, char *argv[]){
 
                 break;
             }
+            case 'c':
+            {
+                rlimit limits;
+
+                if(getrlimit(RLIMIT_CORE, &limits) == -1){
+                    perror("getrlimit");
+                    break;
+                }
+
+                if(limits.rlim_cur == RLIM_INFINITY)
+                    printf("Core file size limit: unlimited\n");
+                else
+                    printf("Core file size limit: %llu bytes\n", (unsigned long long)limits.rlim_cur);
+                
+                break;
+            }
+            case 'v':
+            {
+                for(char **env = environ; *env != NULL; env++)
+                    printf("%s\n", *env);
+                    
+                break;
+            }
             case 'U':
             {
                 char *endptr;
@@ -103,7 +134,7 @@ int main(int argc, char *argv[]){
                 long new_limit = strtol(options[i].argument, &endptr, 10);
 
                 if(endptr == options[i].argument || *endptr != '\0' || errno == ERANGE || new_limit < 0){
-                    printf("Invalid ulimit value\n");
+                    fprintf(stderr, "Invalid ulimit value\n");
                     break;
                 }
 
@@ -111,6 +142,77 @@ int main(int argc, char *argv[]){
 
                 if(result == -1)
                     perror("ulimit");
+
+                break;
+            }
+            case 'C':
+            {
+                char *endptr;
+
+                if(options[i].argument[0] == '-'){
+                    fprintf(stderr, "Invalid core file size\n");
+                    break;
+                }
+
+                errno = 0;
+
+                unsigned long long new_size = strtoull(options[i].argument, &endptr, 10);
+
+                if(endptr == options[i].argument || *endptr != '\0' || errno == ERANGE){
+                    fprintf(stderr, "Invalid core size value\n");
+                    break;
+                }
+
+                rlimit limits;
+
+                if(getrlimit(RLIMIT_CORE, &limits) == -1){
+                    perror("getrlimit");
+                    break;
+                }
+
+                rlim_t converted_size = (rlim_t)new_size;
+
+                if((unsigned long long)converted_size != new_size || converted_size == RLIM_INFINITY){
+                    fprintf(stderr, "Invalid core size value\n");
+                    break;
+                }
+
+                limits.rlim_cur = converted_size;
+
+                if(setrlimit(RLIMIT_CORE, &limits) == -1)
+                    perror("setrlimit");
+        
+                break;
+            }
+            case 'V':
+            {
+                char *argument = options[i].argument;
+                char *separator = strchr(argument, '=');
+
+                if(separator == NULL || separator == argument){
+                    fprintf(stderr, "Invalid enviroment parametrs\n");
+                    break;
+                }
+
+                size_t name_length = (size_t)(separator - argument);
+
+                char *name = (char*)malloc(name_length + 1);
+
+                if(name == NULL){
+                    perror("malloc");
+                    break;
+                }
+
+                memcpy(name, argument, name_length);
+                name[name_length] = '\0';
+
+                char *value = separator + 1;
+
+                if(setenv(name, value, 1) == -1){
+                    perror("setenv");
+                }
+
+                free(name);
 
                 break;
             }
