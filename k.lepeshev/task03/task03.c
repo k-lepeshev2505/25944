@@ -4,8 +4,8 @@
 
 int main(){
 
-    pritntf("Real UID: %lu\n", (unsigned long)getuid());
-    pritntf("Effective UID: %lu\n", (unsigned long)geteuid());
+    printf("Real UID: %lu\n", (unsigned long)getuid());
+    printf("Effective UID: %lu\n", (unsigned long)geteuid());
 
     FILE *file_in = fopen("input.txt", "r");
 
