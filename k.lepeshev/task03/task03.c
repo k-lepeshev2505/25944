@@ -12,17 +12,18 @@ int main(){
     FILE *file_in = fopen("vip_file.txt", "r");
 
     if(file_in == NULL){
-        perror("open");
+        perror("fopen");
     }
     else{
+        printf("File opened successfully\n");
         fclose(file_in);
     }
-    printf("setuid(0) attempt\n");
-    if(setuid(0) == -1){
+    printf("setuid(getuid()) attempt\n");
+    if(setuid(getuid()) == -1){
         perror("setuid");
     }
     else{
-        printf("setuid(0) success\n");
+        printf("setuid(getuid()) success\n");
     }
 
     printf("Second step after setuid\n");
@@ -32,9 +33,10 @@ int main(){
     file_in = fopen("vip_file.txt", "r");
 
     if(file_in == NULL){
-        perror("open");
+        perror("fopen");
     }
     else{
+        printf("File opened successfully\n");
         fclose(file_in);
     }
 
