@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h> // для getuid()
+#include <stdlib.h>
 
 
 int main(){
@@ -19,8 +20,8 @@ int main(){
         perror("setuid");
     }
 
-    pritntf("Real UID: %lu\n", (unsigned long)getuid());
-    pritntf("Effective UID: %lu\n", (unsigned long)geteuid());
+    printf("Real UID: %lu\n", (unsigned long)getuid());
+    printf("Effective UID: %lu\n", (unsigned long)geteuid());
 
     FILE *file_in = fopen("input.txt", "r");
 
