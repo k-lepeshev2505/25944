@@ -98,12 +98,19 @@ int main(int argc, char *argv[]){
                 break;
             case 'u':
             {
-                long limit = ulimit(UL_GETFSIZE);
+                errno = 0;
+                long limit = sysconf(_SC_CHILD_MAX);
 
-                if(limit == -1)
-                    perror("ulimit");
-                else
-                    printf("File size limit: %ld\n", limit);
+                if(limit == -1){
+                    if(errno != 0)
+                        perror("ulimit");
+                    else{
+                        printf("unlimited\n");
+                    }
+                }
+                else{
+                    printf("Ulimit: %ld\n", limit);
+                }
 
                 break;
             }
