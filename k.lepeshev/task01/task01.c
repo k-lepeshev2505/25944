@@ -19,6 +19,11 @@ typedef struct rlimit rlimit;
 
 int main(int argc, char *argv[]){
 
+    if(argc == 1){
+        printf("Usage: %s [-i] [-s] [-p] [-u] [-Ulimit] [-c] [-Csize] [-d] [-v] [-Vname=value]\n", argv[0]);
+        return 0;
+    }
+
     size_t capacity = 1;
 
     for(int i=1; i < argc; i++)

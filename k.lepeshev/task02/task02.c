@@ -16,5 +16,9 @@ int main() {
         sp->tm_mon + 1, sp->tm_mday,
         sp->tm_year + 1900, sp->tm_hour,
         sp->tm_min);
+    printf("%d/%d/%02d %d:%02d PDT\n",
+        sp->tm_mon + 1, sp->tm_mday,
+        sp->tm_year + 1900, sp->tm_hour+1,
+        sp->tm_min);
     exit(0);
 }
