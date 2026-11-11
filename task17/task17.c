@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <termios.h>
 
 #define LIMIT 4096
+#define WIDTH 40
 
 typedef struct StringNode{
     char *string;
@@ -37,23 +40,6 @@ void deleteStringList(StringNode *head){
     }
 }
 
-void printVisibleString(const char *text){
-    const unsigned char *p = (const unsigned char *)text;
-
-    unsigned char c = '\0';
-    while(*p != '\0'){
-        c = *p;
-        if(c < 32 || c == 127){
-            putchar('^');
-            putchar(c == 127 ? '?' : c + 64);
-        }
-        else{
-            putchar(c);
-        }
-        p++;
-    }
-    putchar('\n');
-}
 
 int main(void){
 
@@ -61,44 +47,47 @@ int main(void){
     StringNode *tail = NULL;
 
     char input_str[LIMIT];
+    size_t length = 0;
 
-    while(fgets(input_str, LIMIT, stdin)){
+    struct termios original;
+    struct termios modified;
 
-        if(input_str[0] == '.')
+    if(tcgetattr(STDIN_FILENO, &original) == -1){
+        perror("tcgetattr");
+        exit(1);
+    }
+
+    modified = original;
+
+    modified.c_lflag &= ~(ICANON | ECHO);
+
+    modified.c_cc[VMIN] = 1;
+    modified.c_cc[VTIME] = 0;
+
+    if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &modified) == -1){
+        perror("tcsetattr");
+        exit(1);
+    }
+
+    char ch;
+    ssize_t n;
+
+    while((n = read(STDIN_FILENO, &ch, 1)) == 1){
+        if(ch == 4)
             break;
-
-        size_t len = strlen(input_str);
-
-        if(len > 0 && input_str[len-1] == '\n')
-            input_str[len-1] = '\0';
-        else{
-            int ch = getchar();
-            if(ch != '\n' && ch != EOF){
-                while((ch = getchar()) != '\n' && ch != EOF);
-                fprintf(stderr, "String longer then limit, try again\n");
-                continue;
-            }
+        if(write(STDOUT_FILENO, &ch, 1) != 1){
+            perror("write");
+            break;
         }
-
-        StringNode *node = createNode(input_str);
-        if(node == NULL){
-            deleteStringList(head);
-            return 1;
-        }
-
-        if(head == NULL)
-            head = node;
-        else
-            tail->next = node;
-
-        tail = node;
     }
 
-    for(StringNode *current = head; current != NULL; current = current->next){
-        printVisibleString(current->string);
+    if(n == -1)
+        perror("read");
+
+    if(tcsetattr(STDIN_FILENO, TCSANOW, &original) == -1){
+        perror("tcsetattr restore");
+        exit(1);
     }
 
-    deleteStringList(head);
-
-    return 0;
+    exit(0);
 }
