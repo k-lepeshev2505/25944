@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <termios.h>
+#include <ctype.h>
 
 #define LIMIT 4096
 #define WIDTH 40
@@ -47,6 +48,7 @@ int main(void){
     StringNode *tail = NULL;
 
     char input_str[LIMIT];
+    input_str[0] = '\0';
     size_t length = 0;
 
     struct termios original;
@@ -73,11 +75,35 @@ int main(void){
     ssize_t n;
 
     while((n = read(STDIN_FILENO, &ch, 1)) == 1){
-        if(ch == 4)
-            break;
-        if(write(STDOUT_FILENO, &ch, 1) != 1){
-            perror("write");
-            break;
+        if(ch == 4){
+            if(length == 0)
+                break;
+            
+            write(STDOUT_FILENO, "\a", 1);
+            continue;
+        }
+        if(ch == original.c_cc[VERASE]){
+            if(length > 0){
+                length--;
+                input_str[length] = '\0';
+
+                if(write(STDOUT_FILENO, "\b \b", 3) != 3){
+                    perror("write");
+                    break;
+                }
+            }
+            continue;
+        }
+        if(isprint((unsigned char)ch)){
+            if(length < LIMIT - 1){
+                input_str[length++] = ch;
+                input_str[length] = '\0';
+
+                if(write(STDOUT_FILENO, &ch, 1) != 1){
+                    perror("write");
+                    break;
+                }
+            }
         }
     }
 
