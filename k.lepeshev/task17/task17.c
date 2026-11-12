@@ -5,41 +5,8 @@
 #include <termios.h>
 #include <ctype.h>
 
-#define LIMIT 4096
+#define LIMIT 40
 #define WIDTH 40
-
-typedef struct StringNode{
-    char *string;
-    struct StringNode *next;
-} StringNode;
-
-
-StringNode *createNode(char *input_str){
-    StringNode *node = (StringNode*)malloc(sizeof(StringNode));
-    if(node == NULL)
-        return NULL;
-
-    size_t len = strlen(input_str);
-    node->string = (char*)malloc((len+1)*sizeof(char));
-    if(node->string == NULL){
-        free(node);
-        return NULL;
-    }
-
-    strcpy(node->string, input_str);
-    node->next = NULL;
-
-    return node;
-}
-
-void deleteStringList(StringNode *head){
-    while(head != NULL){
-        StringNode *next = head->next;
-        free(head->string);
-        free(head);
-        head = next;
-    }
-}
 
 int eraseLastChar(char *input_str, size_t *length){
     if(*length == 0)
@@ -80,9 +47,6 @@ int eraseLastWord(char *input_str, size_t *length){
 
 int main(void){
 
-    StringNode *head = NULL;
-    StringNode *tail = NULL;
-
     char input_str[LIMIT];
     input_str[0] = '\0';
     size_t length = 0;
@@ -97,7 +61,8 @@ int main(void){
 
     modified = original;
 
-    modified.c_lflag &= ~(ICANON | ECHO);
+    modified.c_lflag &= ~(ICANON | ECHO | ISIG | IEXTEN);
+    modified.c_iflag &= ~IXON;
 
     modified.c_cc[VMIN] = 1;
     modified.c_cc[VTIME] = 0;
@@ -118,14 +83,14 @@ int main(void){
             write(STDOUT_FILENO, "\a", 1);
             continue;
         }
-        if(ch == original.c_cc[VERASE]){
+        if((unsigned char)ch == original.c_cc[VERASE]){
             if(eraseLastChar(input_str, &length) == -1){
                 perror("eraseLastChar");
                 break;
             }
             continue;
         }
-        if(ch == original.c_cc[VKILL]){
+        if((unsigned char)ch == original.c_cc[VKILL]){
             if(killLine(input_str, &length) == -1){
                 perror("killLine");
                 break;
@@ -148,6 +113,18 @@ int main(void){
                     perror("write");
                     break;
                 }
+            }
+            else{
+                if(write(STDOUT_FILENO, "\a", 1) != 1){
+                    perror("write");
+                    break;
+                }
+            }
+        }
+        else{
+            if(write(STDOUT_FILENO, "\a", 1) != 1){
+                perror("write");
+                break;
             }
         }
     }
