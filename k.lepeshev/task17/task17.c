@@ -41,6 +41,42 @@ void deleteStringList(StringNode *head){
     }
 }
 
+int eraseLastChar(char *input_str, size_t *length){
+    if(*length == 0)
+        return 0;
+    
+    (*length)--;
+    input_str[*length] = '\0';
+
+    if(write(STDOUT_FILENO, "\b \b", 3) != 3)
+        return -1;
+    
+    return 0;
+}
+
+int killLine(char *input_str, size_t *length){
+    while(*length > 0){
+        if(eraseLastChar(input_str, length) == -1)
+            return -1;
+    }
+
+    return 0;
+}
+
+int eraseLastWord(char *input_str, size_t *length){
+    while(*length > 0 && input_str[*length - 1] == ' '){
+        if(eraseLastChar(input_str, length) == -1)
+            return -1;
+    }
+
+    while(*length > 0 && input_str[*length - 1] != ' '){
+        if(eraseLastChar(input_str, length) == -1)
+            return -1;
+    }
+
+    return 0;
+}
+
 
 int main(void){
 
@@ -83,14 +119,23 @@ int main(void){
             continue;
         }
         if(ch == original.c_cc[VERASE]){
-            if(length > 0){
-                length--;
-                input_str[length] = '\0';
-
-                if(write(STDOUT_FILENO, "\b \b", 3) != 3){
-                    perror("write");
-                    break;
-                }
+            if(eraseLastChar(input_str, &length) == -1){
+                perror("eraseLastChar");
+                break;
+            }
+            continue;
+        }
+        if(ch == original.c_cc[VKILL]){
+            if(killLine(input_str, &length) == -1){
+                perror("killLine");
+                break;
+            }
+            continue;
+        }
+        if((unsigned char)ch == 0x17){
+            if(eraseLastWord(input_str, &length) == -1){
+                perror("eraseLastWord");
+                break;
             }
             continue;
         }
