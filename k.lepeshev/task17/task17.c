@@ -5,41 +5,118 @@
 #include <termios.h>
 #include <ctype.h>
 
-#define LIMIT 40
+#define LIMIT 4096
 #define WIDTH 40
 
-int eraseLastChar(char *input_str, size_t *length){
+void eraseLastChar(char *input_str, size_t *length){
     if(*length == 0)
-        return 0;
+        return;
     
     (*length)--;
     input_str[*length] = '\0';
+    
+}
 
-    if(write(STDOUT_FILENO, "\b \b", 3) != 3)
+void killLine(char *input_str, size_t *length){
+    while(*length > 0)
+        eraseLastChar(input_str, length);
+
+}
+
+void eraseLastWord(char *input_str, size_t *length){
+    while(*length > 0 && input_str[*length - 1] == ' ')
+        eraseLastChar(input_str, length);
+
+    while(*length > 0 && input_str[*length - 1] != ' ')
+        eraseLastChar(input_str, length);
+}
+
+int drawWrapped(const char *text, size_t length, size_t* rows){
+    size_t i = 0, column = 0, end = 0, word_end = 0;
+
+    *rows = 1;
+
+    while(i < length){
+        end = i;
+
+        if(text[i] == ' '){
+            while(end < length && text[end] == ' ')
+                end++;
+            
+            word_end = end;
+
+            while(word_end < length && text[word_end] != ' ')
+                word_end++;
+
+            if(word_end > end && column > 0 && column + (word_end - i) > WIDTH){
+                if(write(STDOUT_FILENO, "\r\n", 2) != 2)
+                    return -1;
+                
+                (*rows)++;
+                column = 0;
+                i = end;
+                continue;
+            }
+        }
+        else{
+            while(end < length && text[end] != ' ')
+                end++;
+            
+            if(column > 0 && column + (end - i) > WIDTH){
+                if(write(STDOUT_FILENO, "\r\n", 2) != 2)
+                    return -1;
+
+                (*rows)++;
+                column = 0;
+            }
+        }
+
+        while(i < end){
+            if(column == WIDTH){
+                if(write(STDOUT_FILENO, "\r\n", 2) != 2)
+                    return -1;
+                
+                (*rows)++;
+                column = 0;
+            }
+
+            if(write(STDOUT_FILENO, &text[i], 1) != 1)
+                return -1;
+            
+            column++;
+            i++;
+        }
+    }
+
+    return 0;
+}
+
+int redrawLine(const char *text, size_t length, size_t *previous_rows){
+    char command[32];
+    int n = 0;
+
+    if(write(STDOUT_FILENO, "\r", 1) != 1)
         return -1;
     
-    return 0;
-}
+    if(*previous_rows > 1){
+        n = snprintf(command, sizeof(command), "\033[%zuA", *previous_rows - 1);
 
-int killLine(char *input_str, size_t *length){
-    while(*length > 0){
-        if(eraseLastChar(input_str, length) == -1)
+        if(n < 0 || (size_t)n >= sizeof(command))
+            return -1;
+        
+        if(write(STDOUT_FILENO, command, (size_t)n) != n)
             return -1;
     }
 
-    return 0;
-}
+    if(write(STDOUT_FILENO, "\033[J", 3) != 3)
+        return -1;
 
-int eraseLastWord(char *input_str, size_t *length){
-    while(*length > 0 && input_str[*length - 1] == ' '){
-        if(eraseLastChar(input_str, length) == -1)
-            return -1;
-    }
+    size_t new_rows;
 
-    while(*length > 0 && input_str[*length - 1] != ' '){
-        if(eraseLastChar(input_str, length) == -1)
-            return -1;
-    }
+    if(drawWrapped(text, length, &new_rows) == -1)
+        return -1;
+
+    *previous_rows = new_rows;
 
     return 0;
 }
@@ -49,7 +126,7 @@ int main(void){
 
     char input_str[LIMIT];
     input_str[0] = '\0';
-    size_t length = 0;
+    size_t length = 0, displayed_rows = 1;
 
     struct termios original;
     struct termios modified;
@@ -84,22 +161,28 @@ int main(void){
             continue;
         }
         if((unsigned char)ch == original.c_cc[VERASE]){
-            if(eraseLastChar(input_str, &length) == -1){
-                perror("eraseLastChar");
+            eraseLastChar(input_str, &length);
+
+            if(redrawLine(input_str, length, &displayed_rows) == -1){
+                perror("redrawLine");
                 break;
             }
             continue;
         }
         if((unsigned char)ch == original.c_cc[VKILL]){
-            if(killLine(input_str, &length) == -1){
-                perror("killLine");
+            killLine(input_str, &length);
+
+            if(redrawLine(input_str, length, &displayed_rows) == -1){
+                perror("redrawLine");
                 break;
             }
             continue;
         }
         if((unsigned char)ch == 0x17){
-            if(eraseLastWord(input_str, &length) == -1){
-                perror("eraseLastWord");
+            eraseLastWord(input_str, &length);
+
+            if(redrawLine(input_str, length, &displayed_rows) == -1){
+                perror("redrawLine");
                 break;
             }
             continue;
@@ -109,8 +192,8 @@ int main(void){
                 input_str[length++] = ch;
                 input_str[length] = '\0';
 
-                if(write(STDOUT_FILENO, &ch, 1) != 1){
-                    perror("write");
+                if(redrawLine(input_str, length, &displayed_rows) == -1){
+                    perror("redrawLine");
                     break;
                 }
             }
