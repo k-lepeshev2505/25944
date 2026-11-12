@@ -112,6 +112,7 @@ int main(void){
     char input_str[WIDTH + 1];
     input_str[0] = '\0';
     size_t length = 0;
+    int result = 0;
 
     struct termios original;
     struct termios modified;
@@ -144,6 +145,7 @@ int main(void){
             
             if(writeAll("\a", 1) == -1){
                 perror("write");
+                result = 1;
                 break;
             }
             continue;
@@ -153,6 +155,7 @@ int main(void){
 
             if(redrawLine(input_str, length) == -1){
                 perror("redrawLine");
+                result = 1;
                 break;
             }
             continue;
@@ -162,6 +165,7 @@ int main(void){
 
             if(redrawLine(input_str, length) == -1){
                 perror("redrawLine");
+                result = 1;
                 break;
             }
             continue;
@@ -171,6 +175,7 @@ int main(void){
 
             if(redrawLine(input_str, length) == -1){
                 perror("redrawLine");
+                result = 1;
                 break;
             }
             continue;
@@ -178,24 +183,28 @@ int main(void){
         if(isprint((unsigned char)ch)){
             if(appendChar(input_str, &length, ch) == -1){
                 perror("appendChar");
+                result = 1;
                 break;
             }
         }
         else{
             if(writeAll("\a", 1) == -1){
                 perror("write");
+                result = 1;
                 break;
             }
         }
     }
 
-    if(n == -1)
+    if(n == -1){
         perror("read");
+        result = 1;
+    }
 
     if(tcsetattr(STDIN_FILENO, TCSANOW, &original) == -1){
         perror("tcsetattr restore");
         exit(1);
     }
 
-    exit(0);
+    exit(result);
 }
